@@ -40,7 +40,7 @@ gulp.task('compile', function () {
     .pipe($.jade({ pretty: true }))
     .pipe($.angularTemplatecache({
       transformUrl: function (url) {
-        return '/plugins/oidc-auth/' + url;
+        return '/plugins/oidc-auth' + url;
       }
     }))
     .pipe($.remember('jade'));
