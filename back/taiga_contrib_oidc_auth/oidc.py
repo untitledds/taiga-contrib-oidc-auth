@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import os
 import unicodedata
 
 from django.apps import apps
@@ -26,10 +27,13 @@ from taiga.auth.signals import user_registered as user_registered_signal
 
 class TaigaOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
-    AUTHDATA_KEY = "oidc"
+    AUTHDATA_KEY = os.getenv("OIDC_AUTHDATA_KEY", "oidc")
+    EMAIL_CLAIM = os.getenv("OIDC_CLAIM_EMAIL", "email")
+    FULLNAME_CLAIM = os.getenv("OIDC_CLAIM_FULLNAME", "name")
+    USERNAME_CLAIM = os.getenv("OIDC_CLAIM_USERNAME", "nickname")
 
     def filter_users_by_claims(self, claims):
-        email = claims.get("email")
+        email = claims.get(self.EMAIL_CLAIM)
         if not email:
             return self.UserModel.objects.none()
 
@@ -44,18 +48,18 @@ class TaigaOIDCAuthenticationBackend(OIDCAuthenticationBackend):
             return self.UserModel.objects.none()
 
     def get_username(self, claims):
-        nickname = claims.get("nickname")
+        nickname = claims.get(self.USERNAME_CLAIM)
         if not nickname:
             return super(TaigaOIDCAuthenticationBackend, self).get_username(claims)
         return unicodedata.normalize("NFKC", nickname)[:150]
 
     def create_user(self, claims):
-        email = claims.get("email")
+        email = claims.get(self.EMAIL_CLAIM)
         if not email:
             return None
 
         username = self.get_username(claims)
-        full_name = claims.get("name", username)
+        full_name = claims.get(self.FULLNAME_CLAIM, username)
 
         AuthData = apps.get_model("users", "AuthData")
         try:
@@ -85,7 +89,7 @@ class TaigaOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
     def update_user(self, user, claims):
         try:
-            user.full_name = claims["name"]
+            user.full_name = claims[self.FULLNAME_CLAIM]
         except KeyError:
             pass
         else:
