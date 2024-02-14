@@ -1,161 +1,61 @@
-Taiga contrib Fedora OIDC auth
-==============================
+# Taiga Contrib OIDC Auth
 
-&gt; **READ THIS FIRST!**: We recently announced Taiga plans for the future and they greatly affect how we manage this repository and the current Taiga 6 release. Check it [here](https://blog.taiga.io/announcing_taiganext.html).
+[![Docker Image Version](https://img.shields.io/docker/v/fabianmp/taiga-front?sort=semver&style=flat&logo=docker&label=taiga-front&cacheSeconds=3600)](https://hub.docker.com/repository/docker/fabianmp/taiga-front)
+[![Docker Image Version](https://img.shields.io/docker/v/fabianmp/taiga-back?sort=semver&style=flat&logo=docker&label=taiga-back&cacheSeconds=3600)](https://hub.docker.com/repository/docker/fabianmp/taiga-back)
 
-The Taiga plugin for Fedora's OIDC (OpenID Connect) provider. It has been
-forked off https://github.com/fedora-infra/taiga-contrib-fas-openid-auth.
+Forked from [kaleidos-ventures/taiga-contrib-oidc-auth](https://github.com/kaleidos-ventures/taiga-contrib-oidc-auth)
+and patched to be compatible with [robrotheram/taiga-contrib-openid-auth](https://github.com/robrotheram/taiga-contrib-openid-auth).
 
-Flow diagram
-------------
-
-Roughly, this is how it works
-
-```
-taiga-front             taiga-back         Fedora OIDC
-------------------------------------------------------
-
-add an OIDC
-  button
-    |
-    V
-  click  -----------> generate link
-                           |
-                           *--302----------> auth?
-                                               |
-                   verify and store <----302---*
-                    user in the db
-                           |
-  verify <----302----------*
-and update
-the UI to
-say welcome!
-```
-
-Installation
-------------
-
-### Taiga Back
-
-In your Taiga back python virtualenv install the pip package `taiga-contrib-oidc-auth` with:
-
-```bash
-  pip install taiga-contrib-oidc-auth
-```
-
-Modify your `settings/local.py` and include the lines:
-
-```python
-INSTALLED_APPS += [
-    "mozilla_django_oidc",
-    "taiga_contrib_oidc_auth",
-]
-
-AUTHENTICATION_BACKENDS = list(AUTHENTICATION_BACKENDS) + [
-    "taiga_contrib_oidc_auth.oidc.TaigaOIDCAuthenticationBackend",
-]
-
-# Add the OIDC urls
-ROOT_URLCONF = "settings.urls"
-
-# OIDC Settings
-OIDC_CALLBACK_CLASS = "taiga_contrib_oidc_auth.views.TaigaOIDCAuthenticationCallbackView"
-OIDC_RP_SCOPES = "openid profile email"
-OIDC_RP_SIGN_ALGO = "RS256"
-# Set the OIDC provider here.
-OIDC_BASE_URL = "https://id.fedoraproject.org/openidc"
-# Those URL values work for Ipsilon.
-OIDC_OP_JWKS_ENDPOINT = OIDC_BASE_URL + "/Jwks"
-OIDC_OP_AUTHORIZATION_ENDPOINT = OIDC_BASE_URL + "/Authorization"
-OIDC_OP_TOKEN_ENDPOINT = OIDC_BASE_URL + "/Token"
-OIDC_OP_USER_ENDPOINT = OIDC_BASE_URL + "/UserInfo"
-# These two are private! Don't commit them to VCS. Getting the values from
-# environment variables is a good way.
-import os
-OIDC_RP_CLIENT_ID = os.getenv("OIDC_RP_CLIENT_ID")
-OIDC_RP_CLIENT_SECRET = os.getenv("OIDC_RP_CLIENT_SECRET")
-```
-
-Create a `settings/urls.py` containing:
-
-```python
-from taiga.urls import *
-urlpatterns += [
-    url(r"^oidc/", include("mozilla_django_oidc.urls")),
-]
-```
-
-Now you need a `client_id` and a `client_secret`. If you haven't registered
-with your OIDC provider yet and self-registration is allowed, you may run:
-
-```bash
-  pip install oidc-register
-  oidc-register http://oidc-provider.example.com
-```
-
-It will generate a `client_secrets.json` file that contains the `client_id` and
-`client_secret` values that you must use. With the example `settings.py`
-directives above, you can pass those values as environment variables
-(`OIDC_RP_CLIENT_ID` and `OIDC_RP_CLIENT_SECRET`) when you run the backend API
-(taiga-back).
-
-
-### Taiga Front
-
-Build the frontend plugin:
-
-```bash
-  cd front
-  npm install
-  npm install gulp
-  ./node_modules/.bin/gulp build
-```
-
-If you already have Gulp on your system, you may just call `gulp build` instead
-of the last two lines.
-
-Copy the OIDC compiled code to the taiga-front directory:
-
-```bash
-  mkdir -p $TAIGA_FRONT/dist/plugins/
-  cp -r dist/ $TAIGA_FRONT/dist/plugins/oidc-auth/
-```
-
-Include in your `$TAIGA_FRONT/dist/conf.json` in the `contribPlugins` list the
-value `"/plugins/oidc-auth/oidc-auth.json"`:
-
-```json
-...
-    "contribPlugins": ["/plugins/oidc-auth/oidc-auth.json"],
-...
-```
+This repository also provides Docker images built on top of the [official Taiga.io images](https://hub.docker.com/u/taigaio)
+including the OIDC authentication provider.
 
 ## Configuration
 
-You can change the button logo and text by setting the `oidcButtonText` and
-`oidcButtonImage` configuration values in `$TAIGA_FRONT/dist/conf.json`. For
-example, if you are using Fedora's OIDC provider, you may set:
+### taiga-front
 
-```json
-...
-    "oidcButtonText": "Fedora",
-    "oidcButtonImage": "fedora-logo.png",
-...
+Configure the following environment variables for the container running `taiga-front`:
+
+```sh
+ENABLE_OIDC_AUTH="true"
+OIDC_BUTTON_TEXT="OIDC"  # optionally configure login button
+DEFAULT_LOGIN_ENABLED="false"  # optionally disable local user login
 ```
 
-If you set a different logo, you must copy the file in
-`$TAIGA_FRONT/dist/plugins/oidc-auth/images/contrib/`.
+Enabling OIDC login is independent from setting `PUBLIC_REGISTER_ENABLED`.
 
-If you want to mount the `mozilla_django_oidc` app on a different location in
-taiga-back, you can change the moint point in `$TAIGA_BACK/settings/urls.py`
-and adjust the frontend by defining the `oidcMountPoint` variable in the
-`$TAIGA_FRONT/dist/conf.json` file. Example:
+### taiga-back
 
-```json
-...
-    "oidcMountPoint": "/api/oidc",
-...
+Configure the following environment variables for the container running `taiga-back`:
+
+```sh
+ENABLE_OIDC_AUTH="True"
+OIDC_ISSUER="<url of your OIDC provider>"
+OIDC_CLIENT_ID="<client id configured in OIDC provider"
+OIDC_CLIENT_SECRET="<client secret configured in OIDC provider"
+OIDC_SCOPES="openid profile email"  # optionally configure scopes
+
+# optionally configure endpoints
+OIDC_AUTHORIZATION_ENDPOINT="<url to authorization endpoint>"
+OIDC_JWKS_ENDPOINT="<url to JWKS endpoint>"
+OIDC_TOKEN_ENDPOINT="<url to token endpoint>"
+OIDC_USERINFO_ENDPOINT="<url to user info endpoint>"
+
+# if you run behind a reverse proxy with TLS termination
+# activate this to use HTTPS in the redirect URI
+USE_X_FORWARDED_HOST="True"
 ```
 
-The value defaults to `/oidc`, as used in the examples above. Mounting it
-inside the `/api` namespace may make your HTTP proxy configuration easier.
+## Advanced Configuration / Migration
+
+If you want to migrate from an existing installation using [robrotheram/taiga-contrib-openid-auth](https://github.com/robrotheram/taiga-contrib-openid-auth)
+or if you need to configure the claims returned from your OIDC provider, you can set the following environment variables for the
+container running `taiga-back`:
+
+```sh
+OIDC_AUTHDATA_KEY="openid"  # use existing connection from robrotheram/taiga-contrib-openid-auth
+OIDC_SLUGGIFY_USERNAME="True"  # generate the same username as robrotheram/taiga-contrib-openid-auth
+OIDC_CLAIM_USERNAME="preferred_username"  # use preferred username from OpenID
+OIDC_CLAIM_AUTHDATA="sub"  # claim used to identify OAuth users
+OIDC_CLAIM_EMAIL="email"  # claim containing user's e-mail address
+OIDC_CLAIM_FULLNAME="name"  # claim containing user's full name
+```
