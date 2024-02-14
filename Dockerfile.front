@@ -1,0 +1,18 @@
+FROM node:21-alpine3.19 as build
+
+WORKDIR /tmp/taiga-contrib-oidc-auth
+COPY --chown=taiga:taiga ./front /tmp/taiga-contrib-oidc-auth
+
+RUN npm install
+RUN npx gulp build
+
+
+FROM taigaio/taiga-front:6.7.1
+
+COPY --from=build --chown=taiga:taiga /tmp/taiga-contrib-oidc-auth/dist /usr/share/nginx/html/plugins/oidc-auth
+
+COPY ./config_env_subst.snippet.sh ./conf.snippet.json /tmp/
+RUN sed -i '/Public registration and oauth/r /tmp/config_env_subst.snippet.sh' /docker-entrypoint.d/30_config_env_subst.sh && \
+    sed -i '/"gitLabUrl": "\${GITLAB_URL}"/r /tmp/conf.snippet.json' /usr/share/nginx/html/conf.json.template && \
+    sed -i 's/"defaultLoginEnabled": true,/"defaultLoginEnabled": \${DEFAULT_LOGIN_ENABLED},/' /usr/share/nginx/html/conf.json.template && \
+    rm /tmp/config_env_subst.snippet.sh /tmp/conf.snippet.json

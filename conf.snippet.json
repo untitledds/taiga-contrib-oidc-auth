@@ -1,0 +1,3 @@
+    "oidcButtonText": "${OIDC_BUTTON_TEXT}",
+    "oidcButtonImage": "${OIDC_BUTTON_LOGO}",
+    "oidcMountPoint": "${TAIGA_SUBPATH}/api/oidc",
