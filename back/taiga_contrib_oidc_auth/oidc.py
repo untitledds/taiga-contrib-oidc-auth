@@ -20,6 +20,7 @@ from django.apps import apps
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 from taiga.auth.services import send_register_email
 from taiga.auth.signals import user_registered as user_registered_signal
+from taiga.base.utils.slug import slugify
 
 
 # TODO: check groups? https://mozilla-django-oidc.readthedocs.io/en/stable/installation.html#advanced-user-verification-based-on-their-claims
@@ -47,10 +48,14 @@ class TaigaOIDCAuthenticationBackend(OIDCAuthenticationBackend):
             return self.UserModel.objects.none()
 
     def get_username(self, claims):
-        nickname = claims.get(self.USERNAME_CLAIM)
-        if not nickname:
+        username = claims.get(self.USERNAME_CLAIM)
+        if not username:
             return super(TaigaOIDCAuthenticationBackend, self).get_username(claims)
-        return unicodedata.normalize("NFKC", nickname)[:150]
+
+        if os.getenv("OIDC_SLUGGIFY_USERNAME", "False") == "True":
+            username = slugify(username)
+
+        return unicodedata.normalize("NFKC", username)[:150]
 
     def create_user(self, claims):
         email = claims.get(self.EMAIL_CLAIM)
