@@ -14,6 +14,8 @@ if ENABLE_OIDC_AUTH:
 
     # OIDC Settings
     import os
+    OIDC_PKCE_CODE_CHALLENGE_METHOD = os.getenv("OIDC_PKCE_CODE_CHALLENGE_METHOD","S256")
+    OIDC_USE_PKCE = os.getenv("OIDC_USE_PKCE", "True")
     OIDC_CALLBACK_CLASS = "taiga_contrib_oidc_auth.views.TaigaOIDCAuthenticationCallbackView"
     OIDC_RP_SCOPES = os.getenv("OIDC_SCOPES", "openid profile email")
     OIDC_RP_SIGN_ALGO = "RS256"
@@ -25,7 +27,7 @@ if ENABLE_OIDC_AUTH:
     OIDC_RP_CLIENT_ID = os.getenv("OIDC_CLIENT_ID")
     OIDC_RP_CLIENT_SECRET = os.getenv("OIDC_CLIENT_SECRET")
 
-USE_FORWARED_HOST = os.getenv('USE_X_FORWARDED_HOST', 'False') == 'True'
-if USE_FORWARED_HOST:
-    USE_X_FORWARDED_HOST = USE_FORWARED_HOST
+USE_FORWARDED_HOST = os.getenv('USE_X_FORWARDED_HOST', 'False') == 'True'
+if USE_FORWARDED_HOST:
+    USE_X_FORWARDED_HOST = USE_FORWARDED_HOST
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
