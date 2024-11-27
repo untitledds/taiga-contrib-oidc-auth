@@ -28,7 +28,7 @@ def _make_login_url(data):
             "front": {"domain": "localhost:9001", "scheme": "http", "name": "front"},
         },
     )
-    return "{}://{}/login?{}".format(
+    return "{}://{}/api/oidc/callback/?{}".format(
         SITES["front"]["scheme"], SITES["front"]["domain"], urlencode(data)
     )
 
