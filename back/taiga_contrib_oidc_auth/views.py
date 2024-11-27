@@ -29,7 +29,7 @@ def _make_login_url(data):
         },
     )
     return "{}://{}/api/oidc/callback/?{}".format(
-        SITES["front"]["scheme"], SITES["front"]["domain"], urlencode(data)
+        SITES["api"]["scheme"], SITES["api"]["domain"], urlencode(data)
     )
 
 
