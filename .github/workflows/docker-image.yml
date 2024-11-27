@@ -1,73 +1,93 @@
 name: Docker Image CI
+
 on:
   push:
     branches:
-      - master
+      - add-group
     tags:
-      - '*.*.*'
+      - "*.*.*"
   pull_request:
     branches:
-      - master
+      - add-group
+
 jobs:
   build:
-    name: Push Docker image to GHCR and DockerHub
+    name: Build and Push Docker images
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Docker meta backend image
         id: meta-back
         uses: docker/metadata-action@v5
         with:
           images: |
-            fabianmp/taiga-back,enable=${{ endsWith(github.ref, github.event.repository.default_branch) || github.ref_type == 'tag' }}
-            ghcr.io/fabianmp/taiga-back
+            ghcr.io/untitledds/taiga-back
           flavor: |
             suffix=-oidc
           tags: |
-            type=raw,value=latest,enable=${{ endsWith(github.ref, github.event.repository.default_branch) }}
+            type=raw,value=latest,enable=${{ github.ref_name == 'add-group' }}
             type=semver,pattern={{raw}}
             type=ref,event=pr
+
       - name: Docker meta frontend image
         id: meta-front
         uses: docker/metadata-action@v5
         with:
           images: |
-            fabianmp/taiga-front,enable=${{ endsWith(github.ref, github.event.repository.default_branch) || github.ref_type == 'tag' }}
-            ghcr.io/fabianmp/taiga-front
+            ghcr.io/untitledds/taiga-front
           flavor: |
             suffix=-oidc
           tags: |
-            type=raw,value=latest,enable=${{ endsWith(github.ref, github.event.repository.default_branch) }}
+            type=raw,value=latest,enable=${{ github.ref_name == 'add-group' }}
             type=semver,pattern={{raw}}
             type=ref,event=pr
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Log into DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build and push backend image
         uses: docker/build-push-action@v5
         with:
           file: Dockerfile.back
-          push: true
+          push: ${{ github.ref_type == 'tag' }}
           tags: ${{ steps.meta-back.outputs.tags }}
+          platforms: linux/amd64
+
       - name: Build and push frontend image
         uses: docker/build-push-action@v5
         with:
           file: Dockerfile.front
-          push: true
+          push: ${{ github.ref_type == 'tag' }}
           tags: ${{ steps.meta-front.outputs.tags }}
+          platforms: linux/amd64
+
+      - name: Build and push dev backend image
+        if: github.ref_type != 'tag'
+        uses: docker/build-push-action@v5
+        with:
+          file: Dockerfile.back
+          push: true
+          tags: ghcr.io/untitledds/taiga-back:dev
+          platforms: linux/amd64
+
+      - name: Build and push dev frontend image
+        if: github.ref_type != 'tag'
+        uses: docker/build-push-action@v5
+        with:
+          file: Dockerfile.front
+          push: true
+          tags: ghcr.io/untitledds/taiga-front:dev
+          platforms: linux/amd64
