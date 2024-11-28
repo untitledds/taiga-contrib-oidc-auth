@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: add-group
 
       - name: Docker meta backend image
         id: meta-back
