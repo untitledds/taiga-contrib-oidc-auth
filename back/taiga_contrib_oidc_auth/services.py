@@ -1,3 +1,4 @@
+# back/taiga_contrib_oidc_auth/services.py
 import logging
 from django.db import transaction as tx
 from django.apps import apps
@@ -142,8 +143,8 @@ def oidc_register(
 
 def oidc_login_func(request):
     try:
-        code = request.DATA['code']
-        state = request.DATA['state']
+        code = request.POST['code']
+        state = request.POST['state']
 
         user_info = get_user_info(code, state)
 
