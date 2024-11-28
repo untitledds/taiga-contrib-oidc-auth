@@ -16,7 +16,8 @@ if ENABLE_OIDC_AUTH:
     import os
     OIDC_PKCE_CODE_CHALLENGE_METHOD = os.getenv("OIDC_PKCE_CODE_CHALLENGE_METHOD","S256")
     OIDC_USE_PKCE = os.getenv("OIDC_USE_PKCE", "True")
-    OIDC_CALLBACK_CLASS = "taiga_contrib_oidc_auth.views.TaigaOIDCAuthenticationCallbackView"
+    OIDC_VERIFY_SSL = os.getenv("OIDC_VERIFY_SSL", "False") == "True"
+    #OIDC_CALLBACK_CLASS = "taiga_contrib_oidc_auth.views.TaigaOIDCAuthenticationCallbackView"
     OIDC_RP_SCOPES = os.getenv("OIDC_SCOPES", "openid profile email")
     OIDC_RP_SIGN_ALGO = "RS256"
     OIDC_BASE_URL = os.getenv("OIDC_ISSUER")
