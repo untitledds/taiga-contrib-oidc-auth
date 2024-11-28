@@ -14,6 +14,7 @@ if ENABLE_OIDC_AUTH:
 
     # OIDC Settings
     import os
+    OIDC_REDIRECT_URI = os.getenv("OIDC_REDIRECT_URI", "http://localhost:8000/api/oidc/callback/")
     OIDC_PKCE_CODE_CHALLENGE_METHOD = os.getenv("OIDC_PKCE_CODE_CHALLENGE_METHOD","S256")
     OIDC_USE_PKCE = os.getenv("OIDC_USE_PKCE", "True")
     OIDC_VERIFY_SSL = os.getenv("OIDC_VERIFY_SSL", "False") == "True"
