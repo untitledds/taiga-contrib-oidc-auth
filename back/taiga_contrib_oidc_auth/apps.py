@@ -1,22 +1,14 @@
-# Copyright (C) 2015 Ralph Bean <rbean@redhat.com>
-# Copyright (C) 2018 Aurelien Bompard <aurelien@bompard.org>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+# back/taiga_contrib_oidc_auth/apps.py
 from django.apps import AppConfig
-
 
 class TaigaContribOIDCAuthAppConfig(AppConfig):
     name = "taiga_contrib_oidc_auth"
     verbose_name = "Taiga contrib OIDC auth App Config"
+
+    def ready(self):
+        from taiga.auth.services import register_auth_plugin
+        from . import services
+        register_auth_plugin(
+            "oidc_auth",
+            services.oidc_login_func,
+        )
