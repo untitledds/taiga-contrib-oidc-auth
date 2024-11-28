@@ -1,8 +1,9 @@
-# back/taiga_contrib_oidc_auth/connector.py
-
 import requests
+import logging
 from django.conf import settings
 from taiga.base.connectors.exceptions import ConnectorBaseException
+
+logger = logging.getLogger(__name__)
 
 def get_user_info(code, state):
     """
@@ -31,6 +32,7 @@ def get_user_info(code, state):
     )
 
     if token_response.status_code != 200:
+        logger.error(f"Failed to obtain access token: {token_response.text}")
         raise ConnectorBaseException({
             "error_message": "Failed to obtain access token",
             "status_code": token_response.status_code,
@@ -49,6 +51,7 @@ def get_user_info(code, state):
     )
 
     if userinfo_response.status_code != 200:
+        logger.error(f"Failed to obtain user info: {userinfo_response.text}")
         raise ConnectorBaseException({
             "error_message": "Failed to obtain user info",
             "status_code": userinfo_response.status_code,
