@@ -1,92 +1,74 @@
-# back/taiga_contrib_oidc_auth/services.py
-
-import os
-import unicodedata
-from django.apps import apps
+import logging
 from django.db import transaction as tx
-from mozilla_django_oidc.auth import OIDCAuthenticationBackend
-from taiga.auth.services import send_register_email, make_auth_response_data
-from taiga.auth.signals import user_registered as user_registered_signal
+from django.apps import apps
+from django.conf import settings
 from taiga.base.utils.slug import slugify
+from taiga.auth.services import send_register_email, make_auth_response_data, get_membership_by_token
+from taiga.auth.signals import user_registered as user_registered_signal
+from taiga.base.connectors.exceptions import ConnectorBaseException
+from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 from .connector import get_user_info
 
-# TODO: check groups? https://mozilla-django-oidc.readthedocs.io/en/stable/installation.html#advanced-user-verification-based-on-their-claims
+logger = logging.getLogger(__name__)
 
-USER_KEY = "oidc_auth"
+USER_KEY = getattr(settings, "OIDC_USER_KEY", "oidc_auth")
 
 class TaigaOIDCAuthenticationBackend(OIDCAuthenticationBackend):
-
-    AUTHDATA_KEY = os.getenv("OIDC_AUTHDATA_KEY", "oidc")
-    AUTHDATA_CLAIM = os.getenv("OIDC_CLAIM_AUTHDATA", "sub")
-    EMAIL_CLAIM = os.getenv("OIDC_CLAIM_EMAIL", "email")
-    FULLNAME_CLAIM = os.getenv("OIDC_CLAIM_FULLNAME", "name")
-    USERNAME_CLAIM = os.getenv("OIDC_CLAIM_USERNAME", "nickname")
-
-    def filter_users_by_claims(self, claims):
-        auth_id = claims.get(self.AUTHDATA_CLAIM, self.get_username(claims))
-
-        AuthData = apps.get_model("users", "AuthData")
-        try:
-            auth_data = AuthData.objects.filter(
-                key=self.AUTHDATA_KEY, value=auth_id
-            )
-            return [ad.user for ad in auth_data]
-
-        except AuthData.DoesNotExist:
-            return self.UserModel.objects.none()
-
-    def get_username(self, claims):
-        username = claims.get(self.USERNAME_CLAIM)
-        if not username:
-            return super(TaigaOIDCAuthenticationBackend, self).get_username(claims)
-
-        if os.getenv("OIDC_SLUGGIFY_USERNAME", "False") == "True":
-            username = slugify(username)
-
-        return unicodedata.normalize("NFKC", username)[:150]
-
     def create_user(self, claims):
-        email = claims.get(self.EMAIL_CLAIM)
+        email = claims.get('email')
         if not email:
             return None
 
-        username = self.get_username(claims)
-        full_name = claims.get(self.FULLNAME_CLAIM, username)
-        auth_id = claims.get(self.AUTHDATA_CLAIM, username)
+        username = claims.get('preferred_username')
+        full_name = claims.get('name')
+        oidc_guid = claims.get('sub')
 
-        AuthData = apps.get_model("users", "AuthData")
+        auth_data_model = apps.get_model("users", "AuthData")
+        user_model = apps.get_model("users", "User")
+
         try:
-            # User association exist?
-            auth_data = AuthData.objects.get(key=self.AUTHDATA_KEY, value=auth_id)
+            # OIDC user association exist?
+            auth_data = auth_data_model.objects.get(
+                key=USER_KEY,
+                value=oidc_guid,
+            )
             user = auth_data.user
-        except AuthData.DoesNotExist:
+        except auth_data_model.DoesNotExist:
             try:
-                # Is a user with the same email?
-                user = self.UserModel.objects.get(email=email)
-                AuthData.objects.create(
-                    user=user, key=self.AUTHDATA_KEY, value=auth_id, extra={}
+                # Is a user with the same email as the OIDC user?
+                user = user_model.objects.get(email=email)
+                auth_data_model.objects.create(
+                    user=user,
+                    key=USER_KEY,
+                    value=oidc_guid,
+                    extra={}
                 )
-            except self.UserModel.DoesNotExist:
+            except user_model.DoesNotExist:
                 # Create a new user
-                user = self.UserModel.objects.create(
-                    email=email, username=username, full_name=full_name
+                username_unique = slugify(username)
+                user = user_model.objects.create(
+                    email=email,
+                    username=username_unique,
+                    full_name=full_name,
                 )
-                AuthData.objects.create(
-                    user=user, key=self.AUTHDATA_KEY, value=auth_id, extra={}
+                auth_data_model.objects.create(
+                    user=user,
+                    key=USER_KEY,
+                    value=oidc_guid,
+                    extra={}
                 )
 
                 send_register_email(user)
-                user_registered_signal.send(sender=self.UserModel, user=user)
+                user_registered_signal.send(
+                    sender=user.__class__,
+                    user=user
+                )
 
         return user
 
     def update_user(self, user, claims):
-        try:
-            user.full_name = claims[self.FULLNAME_CLAIM]
-        except KeyError:
-            pass
-        else:
-            user.save()
+        user.full_name = claims.get('name', user.full_name)
+        user.save()
         return user
 
 @tx.atomic
@@ -95,6 +77,7 @@ def oidc_register(
         email: str,
         full_name: str,
         oidc_guid: str,
+        groups: list = None,
         token: str=None,
 ):
     """
@@ -151,19 +134,34 @@ def oidc_register(
         membership.user = user
         membership.save(update_fields=["user"])
 
+    # Update user groups if provided
+    if groups:
+        user.groups.set(groups)
+
     return user
 
 def oidc_login_func(request):
-    code = request.DATA['code']
-    state = request.DATA['state']
+    try:
+        code = request.DATA['code']
+        state = request.DATA['state']
 
-    user_info = get_user_info(code, state)
+        user_info = get_user_info(code, state)
 
-    user = oidc_register(
-        username=user_info['username'],
-        email=user_info['email'],
-        full_name=user_info['full_name'],
-        oidc_guid=user_info['guid'],
-    )
-    data = make_auth_response_data(user)
-    return data
+        user = oidc_register(
+            username=user_info['username'],
+            email=user_info['email'],
+            full_name=user_info['full_name'],
+            oidc_guid=user_info['guid'],
+            groups=user_info.get('groups', []),
+        )
+        data = make_auth_response_data(user)
+        return data
+    except KeyError as e:
+        logger.error(f"Missing required parameter: {e}")
+        raise ConnectorBaseException({
+            "error_message": "Missing required parameter",
+            "details": str(e)
+        })
+    except ConnectorBaseException as e:
+        logger.error(f"OIDC authentication failed: {e.detail}")
+        raise e
