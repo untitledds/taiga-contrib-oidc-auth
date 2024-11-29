@@ -28,6 +28,7 @@ if ENABLE_OIDC_AUTH:
     OIDC_OP_USER_ENDPOINT = os.getenv("OIDC_USERINFO_ENDPOINT", OIDC_BASE_URL + "/protocol/openid-connect/userinfo")
     OIDC_RP_CLIENT_ID = os.getenv("OIDC_CLIENT_ID")
     OIDC_RP_CLIENT_SECRET = os.getenv("OIDC_CLIENT_SECRET")
+    OIDC_OP_JWKS_ENDPOINT = os.get("OIDC_OP_JWKS_ENDPOINT")
 
 USE_FORWARDED_HOST = os.getenv('USE_X_FORWARDED_HOST', 'False') == 'True'
 if USE_FORWARDED_HOST:
